@@ -1,15 +1,15 @@
 window.NEVO_BOOT = function () {
-  // ====== CONFIG YOU MUST SET ======
-  const API_BASE = "PASTE_YOUR_APPS_SCRIPT_EXEC_URL_HERE"; // e.g. https://script.google.com/macros/s/.../exec
-  const API_KEY  = "CHANGE_ME_TO_SOMETHING_RANDOM";       // must match Code.gs API_KEY
-  const NEVO_PIN = "1234";                                // instructor PIN
+  // ====== CONFIG ======
+  const API_BASE = "https://script.google.com/macros/s/AKfycbx1qNcGkqn7a_gXPzxRGTw8q-4TwoMvWQLbMXiMJZ-Rp3QhfEyRvqw4casnV7LKk960/exec";
+  const API_KEY  = "nevo_6Rk9Qp2vT8mX4nH7cL1sZ5yJ3wD0aB8eG9fU2kV7"; // must match Code.gs
+  const NEVO_PIN = "1776";
   const PIN_TTL_DAYS = 30;
 
-  // ====== COURSE CONFIG ======
   const COURSE = { carParSec: 4 * 60 + 20, truckParSec: 5 * 60 + 20, qualifyScore: 80 };
   const LOCATIONS = ["Parallel Park","Backing Alley/Slalom","Garages","Lollipop","Diminishing Lane","Skid Pan","Other (see notes)"];
   const LS_KEY = "nevo_offline_queue_v2";
   const PIN_OK_KEY = "nevo_pin_ok_until_v1";
+
   const pad2 = n => String(n).padStart(2, "0");
   const fmtMMSS = sec => `${pad2(Math.floor(sec / 60))}:${pad2(sec % 60)}`;
   const clamp0 = n => Math.max(0, n);
@@ -32,8 +32,10 @@ window.NEVO_BOOT = function () {
     const input = document.getElementById("pinInput");
     const btn = document.getElementById("pinBtn");
     const err = document.getElementById("pinErr");
+
     gate.style.display = "flex";
     err.style.display = "none";
+
     const attempt = () => {
       const val = (input.value || "").trim();
       if(val === NEVO_PIN){
@@ -45,6 +47,7 @@ window.NEVO_BOOT = function () {
         err.style.display = "block";
       }
     };
+
     btn.onclick = attempt;
     input.onkeydown = (e)=>{ if(e.key==="Enter") attempt(); };
     setTimeout(()=>input.focus(), 50);
@@ -218,16 +221,7 @@ window.NEVO_BOOT = function () {
           </div>
 
           <div class="hideUntilStart">
-            <div class="toggleRow" style="display:flex; gap:10px; flex-wrap:wrap; margin:6px 0 10px;">
-              <label class="toggle" style="display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:999px; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.05);">
-                <input type="checkbox" data-action="vehCar"${lane.vehicle==="car"?" checked":""}/> Car
-              </label>
-              <label class="toggle" style="display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:999px; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.05);">
-                <input type="checkbox" data-action="vehTruck"${lane.vehicle==="truck"?" checked":""}/> Truck (+1:00)
-              </label>
-            </div>
-
-            <div class="notesRow">
+            <div class="notesRow" style="margin:8px 0 12px;">
               <div class="label">Notes</div>
               <textarea data-role="notes" placeholder="optional">${escapeHtml(lane.notes||"")}</textarea>
             </div>
@@ -271,24 +265,6 @@ window.NEVO_BOOT = function () {
 
       laneEl.querySelectorAll("button[data-action]").forEach(btn=>{
         btn.addEventListener("click", ()=>handleAction(idx, btn.dataset.action, btn.dataset.key));
-      });
-
-      laneEl.querySelectorAll("input[type=checkbox][data-action]").forEach(chk=>{
-        chk.addEventListener("change", ()=>{
-          if(chk.dataset.action==="vehCar"){
-            if(chk.checked){
-              lane.vehicle="car";
-              laneEl.querySelector('input[data-action="vehTruck"]').checked=false;
-            } else chk.checked=true;
-          }
-          if(chk.dataset.action==="vehTruck"){
-            if(chk.checked){
-              lane.vehicle="truck";
-              laneEl.querySelector('input[data-action="vehCar"]').checked=false;
-            } else chk.checked=true;
-          }
-          render();
-        });
       });
 
       laneEl.querySelector('[data-role="participant"]').addEventListener("change", (e)=>{
@@ -376,7 +352,6 @@ window.NEVO_BOOT = function () {
     if(action==="end"){
       if(!lane.running && !lane.paused) return;
 
-      // if ended while paused, close out pause time first
       if(lane.paused){
         const now = Date.now();
         const pausedChunk = Math.max(0, now - (lane.pausedAtMs || now));
@@ -389,7 +364,7 @@ window.NEVO_BOOT = function () {
       lane.endMs = Date.now();
       stopTimerInterval(idx);
 
-      // IMPORTANT: we do NOT hide controls after End — they remain until Submit.
+      // Keep controls available until Submit.
       render();
       return;
     }
@@ -404,8 +379,10 @@ window.NEVO_BOOT = function () {
     if(action==="inc" || action==="dec"){
       const delta = action==="inc" ? 1 : -1;
       lane[key] = clamp0((lane[key]||0) + delta);
+
       if(key==="conesBump" && lane[key]===0) lane.bumpLocs.clear();
       if(key==="conesCrush" && lane[key]===0) lane.crushLocs.clear();
+
       render();
       return;
     }
@@ -459,7 +436,7 @@ window.NEVO_BOOT = function () {
     submitBtn.disabled = !ok;
   }
 
-  // ====== API (Roster via JSONP) ======
+  // ===== Roster via JSONP =====
   function fetchRosterNames(){
     return new Promise((resolve) => {
       const cb = `NEVO_ROSTER_CB_${Math.random().toString(36).slice(2)}`;
@@ -484,7 +461,7 @@ window.NEVO_BOOT = function () {
     });
   }
 
-  // ====== API (Submit via sendBeacon / no-cors) ======
+  // ===== Submit via sendBeacon/no-cors =====
   function postSubmit(payload){
     const url = new URL(API_BASE);
     url.searchParams.set("action", "submit");
@@ -492,14 +469,12 @@ window.NEVO_BOOT = function () {
 
     const body = JSON.stringify(payload);
 
-    // Prefer sendBeacon (reliable, no CORS reading needed)
     if (navigator.sendBeacon) {
       const blob = new Blob([body], { type: "application/json" });
       const ok = navigator.sendBeacon(url.toString(), blob);
-      return Promise.resolve({ ok }); // ok=true means queued for send by browser
+      return Promise.resolve({ ok });
     }
 
-    // Fallback: fetch no-cors
     return fetch(url.toString(), {
       method: "POST",
       mode: "no-cors",
@@ -536,7 +511,7 @@ window.NEVO_BOOT = function () {
       const res = await postSubmit(payload);
       if(!res || !res.ok) throw new Error("send_failed");
       handleAction(idx, "clear");
-    } catch(e){
+    }catch(e){
       queueAdd(payload);
       handleAction(idx, "clear");
     }
@@ -560,16 +535,13 @@ window.NEVO_BOOT = function () {
     alert(remaining.length===0 ? "Synced!" : `Synced some. Remaining: ${remaining.length}`);
   }
 
-  // ===== INIT =====
   async function init(){
     document.getElementById("syncBtn").disabled = true;
     updatePendingPill();
-
     rosterNames = await fetchRosterNames();
     render();
   }
 
-  // Boot gated by PIN
   if (isUnlocked()) init();
   else showPinGate();
 };
