@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NEVO</title>
+
+  <meta name="theme-color" content="#070a12">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" sizes="192x192" href="./Nevo%20192.png">
+  <link rel="icon" sizes="512x512" href="./Nevo%20512.png">
+
+  <link rel="apple-touch-icon" href="./Nevo%20512.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="NEVO">
+
+  <style>
+    :root{
+      --bg:#0b0f17;
+      --panel:#111826;
+      --text:#e8eefc;
+      --muted:#a9b4cc;
+      --good:#18c29c;
+      --bad:#ff5b5b;
+      --warn:#ffb020;
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      background:radial-gradient(1200px 600px at 15% -10%, rgba(70,120,255,.18), transparent 60%),
+                 radial-gradient(1000px 500px at 85% 0%, rgba(24,194,156,.12), transparent 55%),
+                 linear-gradient(180deg, #070a12, #04060d 70%);
+      color:var(--text);
+    }
+    header{
+      position:sticky; top:0; z-index:10;
+      padding:14px 18px;
+      display:flex; justify-content:space-between; align-items:center;
+      backdrop-filter: blur(10px);
+      background:linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.15));
+      border-bottom:1px solid rgba(255,255,255,.07);
+    }
+    .brand{font-weight:900; letter-spacing:1px;}
+    .topRight{display:flex; gap:10px; align-items:center;}
+    .pill{
+      padding:8px 12px; border-radius:999px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.06);
+      font-weight:700; font-size:12px;
+    }
+    .btn{
+      padding:9px 14px; border-radius:12px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.08);
+      color:var(--text); font-weight:800;
+      cursor:pointer;
+    }
+    .btn:hover{background:rgba(255,255,255,.12)}
+    .btn:disabled{opacity:.55; cursor:not-allowed}
+
+    main{max-width:1320px; margin:0 auto; padding:16px;}
+    .lanes{display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:18px;}
+    @media (max-width:1100px){ .lanes{grid-template-columns:1fr;} }
+
+    .lane{
+      background:linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:22px;
+      overflow:hidden;
+      box-shadow:0 18px 60px rgba(0,0,0,.50), inset 0 1px 0 rgba(255,255,255,.08);
+    }
+    .laneInner{padding:14px;}
+    .topGrid{display:grid; grid-template-columns:1fr auto; gap:12px; align-items:end; margin-bottom:10px;}
+    .label{font-size:12px; color:var(--muted); font-weight:800; margin-bottom:6px;}
+    select, textarea{
+      width:100%;
+      border-radius:14px; padding:11px 12px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(0,0,0,.25);
+      color:var(--text); outline:none;
+    }
+    textarea{min-height:44px; resize:vertical;}
+
+    .timerBlock{text-align:right; min-width:110px;}
+    .timer{font-size:30px; font-weight:950; letter-spacing:.5px; line-height:1;}
+    .timerMeta{font-size:12px; color:var(--muted); margin-top:6px;}
+
+    .btnRow{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:8px 0 10px;}
+    .btnStart,.btnPause,.btnEnd,.btnClear{
+      padding:10px 12px; border-radius:14px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.06);
+      color:var(--text); font-weight:900;
+      cursor:pointer;
+    }
+    .btnStart{background:rgba(24,194,156,.14); border-color:rgba(24,194,156,.25);}
+    .btnEnd{background:rgba(255,91,91,.14); border-color:rgba(255,91,91,.25);}
+    .btnPause{background:rgba(255,176,32,.14); border-color:rgba(255,176,32,.25);}
+    .btnStart:disabled,.btnPause:disabled,.btnEnd:disabled,.btnClear:disabled{opacity:.55; cursor:not-allowed;}
+
+    .hideUntilStart{display:none;}
+    .armed .hideUntilStart{display:block;}
+
+    .grid2{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px;}
+
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,0.07), rgba(0,0,0,0.20));
+      border:1px solid rgba(255,255,255,0.10);
+      border-radius:18px;
+      padding:12px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+    .cardHeader{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;}
+    .cardHeader .title{font-weight:850; font-size:13px;}
+    .cardHeader .count{font-weight:900; font-size:18px;}
+
+    .stepper{display:flex; gap:12px; justify-content:center; margin:0 0 10px;}
+    .stepper button{
+      width:46px; height:42px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(255,255,255,0.06);
+      color:rgba(255,255,255,0.92);
+      font-size:22px; font-weight:900;
+      cursor:pointer;
+    }
+
+    .locBlock{margin-top:8px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.08); display:flex; flex-direction:column; gap:10px;}
+    .locTitle{font-size:12px; color:rgba(255,255,255,0.70); font-weight:700;}
+    .locItem{
+      display:flex; align-items:center; gap:12px;
+      padding:12px 12px;
+      border-radius:16px;
+      background:rgba(0,0,0,0.22);
+      border:1px solid rgba(255,255,255,0.08);
+      cursor:pointer;
+    }
+    .locItem input{transform:scale(1.15);}
+
+    .bottom{margin-top:12px; display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+    .summary{background:rgba(0,0,0,.25); border:1px solid rgba(255,255,255,.10); border-radius:18px; padding:12px; font-size:13px; line-height:1.35;}
+    .statusWrap{background:linear-gradient(180deg, rgba(24,194,156,.14), rgba(0,0,0,.32)); border:1px solid rgba(24,194,156,.18); border-radius:18px; padding:12px; display:flex; flex-direction:column; gap:8px;}
+    .statusPill{text-align:center; font-weight:900; font-size:18px; color:rgba(154,255,222,.95); border-radius:18px; padding:12px; border:1px solid rgba(55,209,166,0.18);}
+    .subline{font-size:12px; text-align:center; color:rgba(255,255,255,.75);}
+    .submitBtn{margin-top:auto; width:100%; padding:11px 14px; border-radius:14px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.06); color:var(--text); font-weight:900; cursor:pointer;}
+    .submitBtn:disabled{opacity:.55; cursor:not-allowed;}
+    .warn{color:#ffcc66; font-weight:800; margin-top:6px;}
+
+    /* PIN GATE */
+    .pinGate{
+      position:fixed; inset:0; z-index:9999;
+      display:flex; align-items:center; justify-content:center;
+      background:rgba(0,0,0,.55);
+      backdrop-filter: blur(10px);
+      padding:18px;
+    }
+    .pinCard{
+      width:min(520px, 100%);
+      border-radius:22px;
+      border:1px solid rgba(255,255,255,.12);
+      background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(0,0,0,.35));
+      box-shadow:0 20px 70px rgba(0,0,0,.60), inset 0 1px 0 rgba(255,255,255,.08);
+      padding:18px;
+    }
+    .pinTitle{font-weight:950; font-size:18px; margin-bottom:6px;}
+    .pinSub{color:var(--muted); font-size:12px; margin-bottom:12px;}
+    .pinRow{display:flex; gap:10px; align-items:center;}
+    .pinRow input{
+      flex:1; border-radius:14px; padding:11px 12px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(0,0,0,.25);
+      color:var(--text);
+      outline:none;
+      font-size:16px;
+      letter-spacing:.5px;
+    }
+    .pinErr{margin-top:10px; color:#ffcc66; font-weight:800; display:none;}
+  </style>
+</head>
+
+<body>
+  <div class="pinGate" id="pinGate" style="display:none;">
+    <div class="pinCard">
+      <div class="pinTitle">Enter Instructor PIN</div>
+      <div class="pinSub">This is just a lightweight gate to reduce casual access.</div>
+      <div class="pinRow">
+        <input id="pinInput" type="password" placeholder="PIN" autocomplete="off" inputmode="numeric"/>
+        <button class="btn" id="pinBtn">Unlock</button>
+      </div>
+      <div class="pinErr" id="pinErr">Incorrect PIN. Try again.</div>
+    </div>
+  </div>
+
+  <header>
+    <div class="brand">NEVO</div>
+    <div class="topRight">
+      <div class="pill" id="pendingPill">Pending: 0</div>
+      <button class="btn" id="syncBtn">Sync</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="lanes" id="lanes"></div>
+  </main>
+
+  <script src="./app.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js").catch(()=>{});
+      });
+    }
+    window.NEVO_BOOT();
+  </script>
+</body>
+</html>
