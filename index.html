@@ -25,7 +25,6 @@
       --bad:#ff5b5b;
       --warn:#ffb020;
     }
-
     *{box-sizing:border-box}
     body{
       margin:0;
@@ -83,11 +82,9 @@
       color:var(--text); outline:none;
     }
     textarea{min-height:44px; resize:vertical;}
-
     .timerBlock{text-align:right; min-width:110px;}
     .timer{font-size:30px; font-weight:950; letter-spacing:.5px; line-height:1;}
     .timerMeta{font-size:12px; color:var(--muted); margin-top:6px;}
-
     .btnRow{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:8px 0 10px;}
     .btnStart,.btnPause,.btnEnd,.btnClear{
       padding:10px 12px; border-radius:14px;
@@ -100,12 +97,9 @@
     .btnEnd{background:rgba(255,91,91,.14); border-color:rgba(255,91,91,.25);}
     .btnPause{background:rgba(255,176,32,.14); border-color:rgba(255,176,32,.25);}
     .btnStart:disabled,.btnPause:disabled,.btnEnd:disabled,.btnClear:disabled{opacity:.55; cursor:not-allowed;}
-
     .hideUntilStart{display:none;}
     .armed .hideUntilStart{display:block;}
-
     .grid2{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px;}
-
     .card{
       background:linear-gradient(180deg, rgba(255,255,255,0.07), rgba(0,0,0,0.20));
       border:1px solid rgba(255,255,255,0.10);
@@ -116,7 +110,6 @@
     .cardHeader{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;}
     .cardHeader .title{font-weight:850; font-size:13px;}
     .cardHeader .count{font-weight:900; font-size:18px;}
-
     .stepper{display:flex; gap:12px; justify-content:center; margin:0 0 10px;}
     .stepper button{
       width:46px; height:42px;
@@ -127,7 +120,6 @@
       font-size:22px; font-weight:900;
       cursor:pointer;
     }
-
     .locBlock{margin-top:8px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.08); display:flex; flex-direction:column; gap:10px;}
     .locTitle{font-size:12px; color:rgba(255,255,255,0.70); font-weight:700;}
     .locItem{
@@ -149,7 +141,7 @@
     .submitBtn:disabled{opacity:.55; cursor:not-allowed;}
     .warn{color:#ffcc66; font-weight:800; margin-top:6px;}
 
-    /* PIN GATE */
+    /* PIN overlay */
     .pinGate{
       position:fixed; inset:0; z-index:9999;
       display:flex; align-items:center; justify-content:center;
@@ -185,7 +177,7 @@
   <div class="pinGate" id="pinGate" style="display:none;">
     <div class="pinCard">
       <div class="pinTitle">Enter Instructor PIN</div>
-      <div class="pinSub">This is just a lightweight gate to reduce casual access.</div>
+      <div class="pinSub">This is a lightweight gate to reduce casual access.</div>
       <div class="pinRow">
         <input id="pinInput" type="password" placeholder="PIN" autocomplete="off" inputmode="numeric"/>
         <button class="btn" id="pinBtn">Unlock</button>
