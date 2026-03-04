@@ -15,7 +15,6 @@ window.NEVO_BOOT = function () {
   const clamp0 = n => Math.max(0, n);
 
   function nowMs(){ return Date.now(); }
-  function timeOnly(d){ return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'}); }
   function getParSec(vehicle){ return vehicle === "truck" ? COURSE.truckParSec : COURSE.carParSec; }
 
   // ===== PIN GATE =====
@@ -94,7 +93,7 @@ window.NEVO_BOOT = function () {
 
   // ====== COMPUTE ======
   function computeTimeFields(lane){
-    if(!lane.startMs) return { totalSec:0, overSec:0, timePenalty:0, startTime:"", endTime:"" };
+    if(!lane.startMs) return { totalSec:0, overSec:0, timePenalty:0 };
 
     const effectiveEndMs =
       lane.endMs ? lane.endMs :
@@ -110,10 +109,7 @@ window.NEVO_BOOT = function () {
     const startedMinutesOver = overSec === 0 ? 0 : Math.ceil(overSec / 60);
     const timePenalty = startedMinutesOver * 5;
 
-    const startTime = timeOnly(new Date(lane.startMs));
-    const endTime = lane.endMs ? timeOnly(new Date(lane.endMs)) : "";
-
-    return { totalSec, overSec, timePenalty, startTime, endTime };
+    return { totalSec, overSec, timePenalty };
   }
 
   function computePenalties(lane){
@@ -145,14 +141,15 @@ window.NEVO_BOOT = function () {
     const val = lane[key] || 0;
     const needsLoc = (key==="conesBump" || key==="conesCrush");
 
+    // ✅ Back to simple label behavior (tap/click text toggles)
     const locs = needsLoc ? `
       <div class="locBlock" style="display:${val>0?"flex":"none"}">
-        <div class="locTitle">${key==="conesBump"?"Bump locations (tap row to select)":"Crush locations (tap row to select)"}</div>
+        <div class="locTitle">${key==="conesBump"?"Bump locations":"Crush locations"}</div>
         <div class="locList">
           ${LOCATIONS.map(loc=>{
             const checked = (key==="conesBump"? lane.bumpLocs : lane.crushLocs).has(loc);
             return `
-              <label class="locItem" data-role="locRow">
+              <label class="locItem">
                 <input type="checkbox"
                   data-action="${key==="conesBump"?"bumpLoc":"crushLoc"}"
                   data-loc="${escapeHtml(loc)}"${checked?" checked":""}/>
@@ -188,7 +185,9 @@ window.NEVO_BOOT = function () {
     const { status } = computeScore(lane);
     const participantOptions = rosterNames.map(n=>`<option value="${escapeHtml(n)}"${lane.participant===n?" selected":""}>${escapeHtml(n)}</option>`).join("");
     const pauseLabel = lane.paused ? "Resume" : "Pause";
-    const vehicleMeta = lane.vehicle==="truck" ? "Truck (+1:00 par)" : "Car";
+
+    // ✅ Remove (+1:00 par) text — just “Car” / “Truck”
+    const vehicleMeta = lane.vehicle==="truck" ? "Truck" : "Car";
 
     const vehicleToggles = `
       <div class="toggleRow" style="margin:6px 0 10px;">
@@ -198,7 +197,7 @@ window.NEVO_BOOT = function () {
         </label>
         <label class="toggle">
           <input type="checkbox" data-action="vehTruck" ${lane.vehicle==="truck" ? "checked":""}/>
-          Truck (+1:00)
+          Truck
         </label>
       </div>
     `;
@@ -272,7 +271,7 @@ window.NEVO_BOOT = function () {
   function attachHandlers(){
     document.getElementById("syncBtn").onclick = syncQueue;
 
-    // ✅ click Pending pill to clear stuck items
+    // click Pending pill to clear local stuck items
     const pill = document.getElementById("pendingPill");
     if (pill) {
       pill.onclick = () => {
@@ -327,6 +326,7 @@ window.NEVO_BOOT = function () {
         });
       });
 
+      // location checkboxes
       laneEl.querySelectorAll('input[type="checkbox"][data-action="bumpLoc"]').forEach(cb=>{
         cb.addEventListener("change", ()=>{
           const loc=cb.dataset.loc;
@@ -339,16 +339,6 @@ window.NEVO_BOOT = function () {
           const loc=cb.dataset.loc;
           if(cb.checked) lane.crushLocs.add(loc); else lane.crushLocs.delete(loc);
           updateSummary(idx);
-        });
-      });
-
-      laneEl.querySelectorAll('[data-role="locRow"]').forEach(row=>{
-        row.addEventListener("click", (ev)=>{
-          if(ev.target && ev.target.tagName === "INPUT") return;
-          const cb = row.querySelector('input[type="checkbox"]');
-          if(!cb) return;
-          cb.checked = !cb.checked;
-          cb.dispatchEvent(new Event("change", { bubbles: true }));
         });
       });
     });
@@ -553,16 +543,16 @@ window.NEVO_BOOT = function () {
 
   async function submitLane(idx){
     const lane = lanesState[idx];
-    const { totalSec, overSec, timePenalty, startTime, endTime } = computeTimeFields(lane);
+    const { totalSec, overSec, timePenalty } = computeTimeFields(lane);
     const { score, status, totalPenalty } = computeScore(lane);
 
     const submissionId = newSubmissionId();
 
+    // ✅ No start/end time sent. Vehicle replaces them.
     const payload = {
       submissionId,
       participant: lane.participant,
-      startTime,
-      endTime,
+      vehicle: lane.vehicle,                 // "car" or "truck"
       totalTime: fmtMMSS(totalSec),
       overSeconds: overSec,
       timePenalty,
@@ -580,7 +570,6 @@ window.NEVO_BOOT = function () {
 
     const sent = await postSubmit(payload);
     if(!sent){
-      // keep this one—only shows on failure
       alert("Submit failed to send (network). Saved to Pending.");
       queueAdd(payload);
       handleAction(idx, "clear");
@@ -589,7 +578,7 @@ window.NEVO_BOOT = function () {
 
     const ok = await confirmWritten(submissionId);
     if(ok){
-      // ✅ no success message (fast workflow)
+      // silent success
       handleAction(idx, "clear");
       return;
     }
@@ -603,13 +592,11 @@ window.NEVO_BOOT = function () {
     const q = loadQueue();
     if(q.length===0) return;
 
-    // ✅ upgrade legacy items that might be missing submissionId
+    // upgrade legacy pending items
     let mutated = false;
     for (const item of q) {
-      if (!item.submissionId) {
-        item.submissionId = newSubmissionId();
-        mutated = true;
-      }
+      if (!item.submissionId) { item.submissionId = newSubmissionId(); mutated = true; }
+      if (!item.vehicle) { item.vehicle = "car"; mutated = true; } // safe default
     }
     if (mutated) saveQueue(q);
 
