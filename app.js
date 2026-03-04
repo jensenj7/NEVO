@@ -5,7 +5,6 @@ window.NEVO_BOOT = function () {
   const NEVO_PIN = "1776";
   const PIN_TTL_DAYS = 30;
 
-  // Truck adds 1:00 to par (Car: 4:20 / Truck: 5:20)
   const COURSE = { carParSec: 4 * 60 + 20, truckParSec: 5 * 60 + 20, qualifyScore: 80 };
   const LOCATIONS = ["Parallel Park","Backing Alley/Slalom","Garages","Lollipop","Diminishing Lane","Skid Pan","Other (see notes)"];
   const LS_KEY = "nevo_offline_queue_v2";
@@ -64,7 +63,7 @@ window.NEVO_BOOT = function () {
       timerInterval:null,
       pausedAtMs:null,
       pausedTotalMs:0,
-      vehicle:"car",          // "car" or "truck"
+      vehicle:"car",
       participant:"",
       notes:"",
       conesBump:0,
@@ -83,6 +82,7 @@ window.NEVO_BOOT = function () {
   function loadQueue(){ try{ return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); }catch(e){ return []; } }
   function saveQueue(q){ localStorage.setItem(LS_KEY, JSON.stringify(q)); }
   function queueAdd(item){ const q = loadQueue(); q.push(item); saveQueue(q); updatePendingPill(); }
+  function clearQueue(){ localStorage.removeItem(LS_KEY); updatePendingPill(); }
 
   function updatePendingPill(){
     const q = loadQueue();
@@ -145,7 +145,6 @@ window.NEVO_BOOT = function () {
     const val = lane[key] || 0;
     const needsLoc = (key==="conesBump" || key==="conesCrush");
 
-    // ✅ Entire row is tappable: we use <label> and we also add data-role="locRow"
     const locs = needsLoc ? `
       <div class="locBlock" style="display:${val>0?"flex":"none"}">
         <div class="locTitle">${key==="conesBump"?"Bump locations (tap row to select)":"Crush locations (tap row to select)"}</div>
@@ -189,10 +188,8 @@ window.NEVO_BOOT = function () {
     const { status } = computeScore(lane);
     const participantOptions = rosterNames.map(n=>`<option value="${escapeHtml(n)}"${lane.participant===n?" selected":""}>${escapeHtml(n)}</option>`).join("");
     const pauseLabel = lane.paused ? "Resume" : "Pause";
-
     const vehicleMeta = lane.vehicle==="truck" ? "Truck (+1:00 par)" : "Car";
 
-    // ✅ Vehicle checkboxes are back
     const vehicleToggles = `
       <div class="toggleRow" style="margin:6px 0 10px;">
         <label class="toggle">
@@ -275,26 +272,37 @@ window.NEVO_BOOT = function () {
   function attachHandlers(){
     document.getElementById("syncBtn").onclick = syncQueue;
 
+    // ✅ click Pending pill to clear stuck items
+    const pill = document.getElementById("pendingPill");
+    if (pill) {
+      pill.onclick = () => {
+        const q = loadQueue();
+        if (q.length === 0) return;
+        if (confirm(`Clear ${q.length} pending entries from this device? (This cannot be undone)`)) {
+          clearQueue();
+        }
+      };
+      pill.style.cursor = "pointer";
+      pill.title = "Click to clear pending entries on this device";
+    }
+
     document.querySelectorAll(".lane").forEach(laneEl=>{
       const idx = Number(laneEl.dataset.idx);
       const lane = lanesState[idx];
 
-      // buttons
       laneEl.querySelectorAll("button[data-action]").forEach(btn=>{
         btn.addEventListener("click", ()=>handleAction(idx, btn.dataset.action, btn.dataset.key));
       });
 
-      // participant
       laneEl.querySelector('[data-role="participant"]').addEventListener("change", (e)=>{
         lane.participant = e.target.value;
         updateSummary(idx);
       });
 
-      // notes
       const notesEl = laneEl.querySelector('[data-role="notes"]');
       if(notesEl) notesEl.addEventListener("input", (e)=>{ lane.notes = e.target.value; });
 
-      // ✅ vehicle toggles (mutually exclusive)
+      // vehicle toggles (mutually exclusive)
       laneEl.querySelectorAll('input[type="checkbox"][data-action="vehCar"], input[type="checkbox"][data-action="vehTruck"]').forEach(chk=>{
         chk.addEventListener("change", ()=>{
           if(chk.dataset.action === "vehCar"){
@@ -303,7 +311,7 @@ window.NEVO_BOOT = function () {
               const other = laneEl.querySelector('input[data-action="vehTruck"]');
               if(other) other.checked = false;
             } else {
-              chk.checked = true; // don’t allow neither selected
+              chk.checked = true;
             }
           }
           if(chk.dataset.action === "vehTruck"){
@@ -315,13 +323,10 @@ window.NEVO_BOOT = function () {
               chk.checked = true;
             }
           }
-          // update par/summary display
-          tickTimer(idx);
           render();
         });
       });
 
-      // ✅ location checkboxes: update Sets on change (existing behavior)
       laneEl.querySelectorAll('input[type="checkbox"][data-action="bumpLoc"]').forEach(cb=>{
         cb.addEventListener("change", ()=>{
           const loc=cb.dataset.loc;
@@ -337,10 +342,8 @@ window.NEVO_BOOT = function () {
         });
       });
 
-      // ✅ make the entire row reliably toggle (even if tap lands on padding)
       laneEl.querySelectorAll('[data-role="locRow"]').forEach(row=>{
         row.addEventListener("click", (ev)=>{
-          // If user clicked the checkbox itself, let default behavior happen.
           if(ev.target && ev.target.tagName === "INPUT") return;
           const cb = row.querySelector('input[type="checkbox"]');
           if(!cb) return;
@@ -440,10 +443,8 @@ window.NEVO_BOOT = function () {
   function tickTimer(idx){
     const laneEl = document.querySelector(`.lane[data-idx="${idx}"]`);
     if(!laneEl) return;
-
     const lane = lanesState[idx];
     const { totalSec } = computeTimeFields(lane);
-
     laneEl.querySelector('[data-role="timer"]').textContent = fmtMMSS(totalSec);
     updateSummary(idx);
   }
@@ -579,6 +580,7 @@ window.NEVO_BOOT = function () {
 
     const sent = await postSubmit(payload);
     if(!sent){
+      // keep this one—only shows on failure
       alert("Submit failed to send (network). Saved to Pending.");
       queueAdd(payload);
       handleAction(idx, "clear");
@@ -587,7 +589,7 @@ window.NEVO_BOOT = function () {
 
     const ok = await confirmWritten(submissionId);
     if(ok){
-      alert("Submitted successfully ✅");
+      // ✅ no success message (fast workflow)
       handleAction(idx, "clear");
       return;
     }
@@ -601,6 +603,16 @@ window.NEVO_BOOT = function () {
     const q = loadQueue();
     if(q.length===0) return;
 
+    // ✅ upgrade legacy items that might be missing submissionId
+    let mutated = false;
+    for (const item of q) {
+      if (!item.submissionId) {
+        item.submissionId = newSubmissionId();
+        mutated = true;
+      }
+    }
+    if (mutated) saveQueue(q);
+
     const remaining=[];
     for(const item of q){
       const sent = await postSubmit(item);
@@ -610,7 +622,10 @@ window.NEVO_BOOT = function () {
     }
     saveQueue(remaining);
     updatePendingPill();
-    alert(remaining.length===0 ? "Synced!" : `Synced some. Remaining: ${remaining.length}`);
+
+    if (remaining.length !== 0) {
+      alert(`Synced some. Remaining: ${remaining.length}\nTip: click “Pending” to clear stuck entries on this device.`);
+    }
   }
 
   async function init(){
