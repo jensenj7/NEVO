@@ -1,6 +1,6 @@
 window.NEVO_BOOT = function () {
   // ====== CONFIG ======
-  const API_BASE = "https://script.google.com/macros/s/AKfycbx1qNcGkqn7a_gXPzxRGTw8q-4TwoMvWQLbMXiMJZ-Rp3QhfEyRvqw4casnV7LKk960/exec";
+  const API_BASE = "https://script.google.com/macros/s/AKfycbz_Xa0q547X1k8rzWmLJbMFMVFzx7lJJ9RnjdFlREcZKMq7ubSZ5tSr__6FXQqJgRXM/exec";
   const API_KEY  = "nevo_6Rk9Qp2vT8mX4nH7cL1sZ5yJ3wD0aB8eG9fU2kV7";
   const NEVO_PIN = "1776";
   const PIN_TTL_DAYS = 30;
