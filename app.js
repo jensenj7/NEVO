@@ -433,27 +433,20 @@ window.NEVO_BOOT = function () {
     submitBtn.disabled = !ok;
   }
 
-  // ===== Roster via JSONP =====
-  function fetchRosterNames(){
-    return new Promise((resolve) => {
-      const cb = `NEVO_ROSTER_CB_${Math.random().toString(36).slice(2)}`;
+  // ===== JSONP helpers (Roster + Submit) =====
+  function jsonpCall(params){
+    return new Promise((resolve, reject) => {
+      const cb = `NEVO_JSONP_CB_${Math.random().toString(36).slice(2)}`;
       const script = document.createElement("script");
 
       window[cb] = (data) => {
         try { delete window[cb]; } catch(e) { window[cb] = undefined; }
         script.remove();
-
-        if (!data || data.ok !== true) {
-          alert(`Roster fetch failed: ${data && data.error ? data.error : "unknown error"}\n\nMost common fixes:\n- API_KEY mismatch between Code.gs and app.js\n- Apps Script not redeployed after editing Code.gs\n- Web App access not set to Anyone`);
-          return resolve([]);
-        }
-
-        if (!Array.isArray(data.names)) return resolve([]);
-        return resolve(data.names);
+        resolve(data);
       };
 
       const url = new URL(API_BASE);
-      url.searchParams.set("action", "roster");
+      Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, v));
       url.searchParams.set("key", API_KEY);
       url.searchParams.set("callback", cb);
 
@@ -461,34 +454,30 @@ window.NEVO_BOOT = function () {
       script.onerror = () => {
         try { delete window[cb]; } catch(e) { window[cb] = undefined; }
         script.remove();
-        alert("Roster fetch failed (network/script error). Check Web App access is set to Anyone and the /exec URL is correct.");
-        resolve([]);
+        reject(new Error("jsonp_error"));
       };
 
       document.head.appendChild(script);
     });
   }
 
-  // ===== Submit via sendBeacon/no-cors =====
-  function postSubmit(payload){
-    const url = new URL(API_BASE);
-    url.searchParams.set("action", "submit");
-    url.searchParams.set("key", API_KEY);
-
-    const body = JSON.stringify(payload);
-
-    if (navigator.sendBeacon) {
-      const blob = new Blob([body], { type: "application/json" });
-      const ok = navigator.sendBeacon(url.toString(), blob);
-      return Promise.resolve({ ok });
+  async function fetchRosterNames(){
+    try{
+      const data = await jsonpCall({ action:"roster" });
+      if(data && data.ok && Array.isArray(data.names)) return data.names;
+      alert(`Roster fetch failed: ${data && data.error ? data.error : "unknown error"}`);
+      return [];
+    }catch(e){
+      alert("Roster fetch failed (network/script error).");
+      return [];
     }
+  }
 
-    return fetch(url.toString(), {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "application/json" },
-      body
-    }).then(() => ({ ok: true })).catch(() => ({ ok: false }));
+  async function submitToServer(payload){
+    // Submit via JSONP so we can read {ok:true} or error text.
+    const encoded = encodeURIComponent(JSON.stringify(payload));
+    const data = await jsonpCall({ action:"submit", payload: encoded });
+    return data;
   }
 
   async function submitLane(idx){
@@ -516,10 +505,18 @@ window.NEVO_BOOT = function () {
     };
 
     try{
-      const res = await postSubmit(payload);
-      if(!res || !res.ok) throw new Error("send_failed");
+      const res = await submitToServer(payload);
+      if(res && res.ok){
+        handleAction(idx, "clear");
+        return;
+      }
+      // If server responded with an error, show it and queue offline
+      alert(`Submit failed: ${res && res.error ? res.error : "unknown error"}\nSaved to Pending for later sync.`);
+      queueAdd(payload);
       handleAction(idx, "clear");
     }catch(e){
+      // Network/script error
+      alert("Submit failed (network). Saved to Pending for later sync.");
       queueAdd(payload);
       handleAction(idx, "clear");
     }
@@ -532,7 +529,7 @@ window.NEVO_BOOT = function () {
     const remaining=[];
     for(const item of q){
       try{
-        const res = await postSubmit(item);
+        const res = await submitToServer(item);
         if(!(res && res.ok)) remaining.push(item);
       }catch(e){
         remaining.push(item);
@@ -548,10 +545,6 @@ window.NEVO_BOOT = function () {
     updatePendingPill();
 
     rosterNames = await fetchRosterNames();
-    if (rosterNames.length === 0) {
-      alert("Roster loaded 0 names.\n\nIf your roster URL test returns ok:true but names is empty, check:\n- Sheet name is exactly 'Roster'\n- Names are in column A starting at A2\n- Spreadsheet ID in Code.gs is correct");
-    }
-
     render();
   }
 
