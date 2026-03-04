@@ -1,6 +1,5 @@
 window.NEVO_BOOT = function () {
-  // ====== CONFIG ======
-  const API_BASE = "https://script.google.com/macros/s/AKfycbz_Xa0q547X1k8rzWmLJbMFMVFzx7lJJ9RnjdFlREcZKMq7ubSZ5tSr__6FXQqJgRXM/exec";
+  const API_BASE = "https://script.google.com/macros/s/AKfycbz_Xa0q547X1k8rzWmLJbMFMVFzx7lJJ9RnjdFlREcZKMq7ubSZ5tSr__6FXQqJgRXM/exec"; // <-- keep the working one
   const API_KEY  = "nevo_6Rk9Qp2vT8mX4nH7cL1sZ5yJ3wD0aB8eG9fU2kV7";
   const NEVO_PIN = "1776";
   const PIN_TTL_DAYS = 30;
@@ -18,7 +17,6 @@ window.NEVO_BOOT = function () {
   function timeOnly(d){ return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'}); }
   function getParSec(vehicle){ return vehicle === "truck" ? COURSE.truckParSec : COURSE.carParSec; }
 
-  // ===== PIN GATE =====
   function isUnlocked(){
     const until = Number(localStorage.getItem(PIN_OK_KEY) || 0);
     return until && nowMs() < until;
@@ -53,7 +51,6 @@ window.NEVO_BOOT = function () {
     setTimeout(()=>input.focus(), 50);
   }
 
-  // ====== STATE ======
   function newLaneState(){
     return Object.seal({
       running:false,
@@ -78,7 +75,6 @@ window.NEVO_BOOT = function () {
   const lanesState = [newLaneState(), newLaneState(), newLaneState()];
   let rosterNames = [];
 
-  // ====== OFFLINE QUEUE ======
   function loadQueue(){ try{ return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); }catch(e){ return []; } }
   function saveQueue(q){ localStorage.setItem(LS_KEY, JSON.stringify(q)); }
   function queueAdd(item){ const q = loadQueue(); q.push(item); saveQueue(q); updatePendingPill(); }
@@ -91,7 +87,6 @@ window.NEVO_BOOT = function () {
     if (syncBtn) syncBtn.disabled = q.length === 0;
   }
 
-  // ====== COMPUTE ======
   function computeTimeFields(lane){
     if(!lane.startMs) return { totalSec:0, overSec:0, timePenalty:0, startTime:"", endTime:"" };
 
@@ -132,7 +127,6 @@ window.NEVO_BOOT = function () {
     return { score, status, nonTimePenalty, timePenalty, totalPenalty };
   }
 
-  // ====== UI ======
   function escapeHtml(str){
     return String(str||"")
       .replaceAll("&","&amp;")
@@ -433,7 +427,6 @@ window.NEVO_BOOT = function () {
     submitBtn.disabled = !ok;
   }
 
-  // ===== JSONP helpers (Roster + Submit) =====
   function jsonpCall(params){
     return new Promise((resolve, reject) => {
       const cb = `NEVO_JSONP_CB_${Math.random().toString(36).slice(2)}`;
@@ -474,13 +467,14 @@ window.NEVO_BOOT = function () {
   }
 
   async function submitToServer(payload){
-    // Submit via JSONP so we can read {ok:true} or error text.
-    const encoded = encodeURIComponent(JSON.stringify(payload));
-    const data = await jsonpCall({ action:"submit", payload: encoded });
-    return data;
+    // IMPORTANT: send raw JSON string (URLSearchParams encodes it)
+    return await jsonpCall({ action:"submit", payload: JSON.stringify(payload) });
   }
 
   async function submitLane(idx){
+    // ✅ You should ALWAYS see this if the click handler is firing.
+    alert("Submitting…");
+
     const lane = lanesState[idx];
     const { totalSec, overSec, timePenalty, startTime, endTime } = computeTimeFields(lane);
     const { score, status, totalPenalty } = computeScore(lane);
@@ -507,16 +501,15 @@ window.NEVO_BOOT = function () {
     try{
       const res = await submitToServer(payload);
       if(res && res.ok){
+        alert("Submitted successfully ✅");
         handleAction(idx, "clear");
         return;
       }
-      // If server responded with an error, show it and queue offline
       alert(`Submit failed: ${res && res.error ? res.error : "unknown error"}\nSaved to Pending for later sync.`);
       queueAdd(payload);
       handleAction(idx, "clear");
     }catch(e){
-      // Network/script error
-      alert("Submit failed (network). Saved to Pending for later sync.");
+      alert("Submit failed (network/script error). Saved to Pending for later sync.");
       queueAdd(payload);
       handleAction(idx, "clear");
     }
@@ -543,7 +536,6 @@ window.NEVO_BOOT = function () {
   async function init(){
     document.getElementById("syncBtn").disabled = true;
     updatePendingPill();
-
     rosterNames = await fetchRosterNames();
     render();
   }
