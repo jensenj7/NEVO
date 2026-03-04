@@ -224,7 +224,7 @@ window.NEVO_BOOT = function () {
               ${countCard("Cones (Bump)", idx, "conesBump")}
               ${countCard("Cones (Crush)", idx, "conesCrush")}
               ${countCard("Turn Signal", idx, "turnSignal")}
-              ${countCard("Stop Sign", idx, "stopSign")}
+              ${countCard("Stop Sign)", idx, "stopSign")}
             </div>
 
             <div class="bottom">
@@ -474,7 +474,6 @@ window.NEVO_BOOT = function () {
   }
 
   async function confirmWritten(submissionId){
-    // poll up to ~8 seconds
     const deadline = Date.now() + 8000;
     while(Date.now() < deadline){
       try{
@@ -513,7 +512,6 @@ window.NEVO_BOOT = function () {
       notes: lane.notes || ""
     };
 
-    // fire POST
     const sent = await postSubmit(payload);
     if(!sent){
       alert("Submit failed to send (network). Saved to Pending.");
@@ -522,7 +520,6 @@ window.NEVO_BOOT = function () {
       return;
     }
 
-    // confirm write
     const ok = await confirmWritten(submissionId);
     if(ok){
       alert("Submitted successfully ✅");
