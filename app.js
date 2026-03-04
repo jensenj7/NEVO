@@ -5,6 +5,7 @@ window.NEVO_BOOT = function () {
   const NEVO_PIN = "1776";
   const PIN_TTL_DAYS = 30;
 
+  // Truck adds 1:00 to par (Car: 4:20 / Truck: 5:20)
   const COURSE = { carParSec: 4 * 60 + 20, truckParSec: 5 * 60 + 20, qualifyScore: 80 };
   const LOCATIONS = ["Parallel Park","Backing Alley/Slalom","Garages","Lollipop","Diminishing Lane","Skid Pan","Other (see notes)"];
   const LS_KEY = "nevo_offline_queue_v2";
@@ -63,7 +64,7 @@ window.NEVO_BOOT = function () {
       timerInterval:null,
       pausedAtMs:null,
       pausedTotalMs:0,
-      vehicle:"car",
+      vehicle:"car",          // "car" or "truck"
       participant:"",
       notes:"",
       conesBump:0,
@@ -144,15 +145,18 @@ window.NEVO_BOOT = function () {
     const val = lane[key] || 0;
     const needsLoc = (key==="conesBump" || key==="conesCrush");
 
+    // ✅ Entire row is tappable: we use <label> and we also add data-role="locRow"
     const locs = needsLoc ? `
       <div class="locBlock" style="display:${val>0?"flex":"none"}">
-        <div class="locTitle">${key==="conesBump"?"Bump locations (select at least 1)":"Crush locations (select at least 1)"}</div>
+        <div class="locTitle">${key==="conesBump"?"Bump locations (tap row to select)":"Crush locations (tap row to select)"}</div>
         <div class="locList">
           ${LOCATIONS.map(loc=>{
             const checked = (key==="conesBump"? lane.bumpLocs : lane.crushLocs).has(loc);
             return `
-              <label class="locItem">
-                <input type="checkbox" data-action="${key==="conesBump"?"bumpLoc":"crushLoc"}" data-loc="${escapeHtml(loc)}"${checked?" checked":""}/>
+              <label class="locItem" data-role="locRow">
+                <input type="checkbox"
+                  data-action="${key==="conesBump"?"bumpLoc":"crushLoc"}"
+                  data-loc="${escapeHtml(loc)}"${checked?" checked":""}/>
                 <span>${escapeHtml(loc)}</span>
               </label>
             `;
@@ -186,6 +190,22 @@ window.NEVO_BOOT = function () {
     const participantOptions = rosterNames.map(n=>`<option value="${escapeHtml(n)}"${lane.participant===n?" selected":""}>${escapeHtml(n)}</option>`).join("");
     const pauseLabel = lane.paused ? "Resume" : "Pause";
 
+    const vehicleMeta = lane.vehicle==="truck" ? "Truck (+1:00 par)" : "Car";
+
+    // ✅ Vehicle checkboxes are back
+    const vehicleToggles = `
+      <div class="toggleRow" style="margin:6px 0 10px;">
+        <label class="toggle">
+          <input type="checkbox" data-action="vehCar" ${lane.vehicle==="car" ? "checked":""}/>
+          Car
+        </label>
+        <label class="toggle">
+          <input type="checkbox" data-action="vehTruck" ${lane.vehicle==="truck" ? "checked":""}/>
+          Truck (+1:00)
+        </label>
+      </div>
+    `;
+
     return `
       <div class="lane ${lane.running ? "running":""} ${armed ? "armed":""}" data-idx="${idx}">
         <div class="laneInner">
@@ -200,7 +220,7 @@ window.NEVO_BOOT = function () {
             <div class="timerBlock">
               <div class="timer" data-role="timer">00:00</div>
               <div class="timerMeta">
-                Time: ${fmtMMSS(par)} • Vehicle: ${lane.vehicle==="truck"?"Truck":"Car"}
+                Par: ${fmtMMSS(par)} • Vehicle: ${vehicleMeta}
                 ${lane.paused && !ended ? " • Paused" : ""}
                 ${lane.endMs ? " • Ended" : ""}
               </div>
@@ -215,6 +235,8 @@ window.NEVO_BOOT = function () {
           </div>
 
           <div class="hideUntilStart">
+            ${vehicleToggles}
+
             <div class="notesRow" style="margin:8px 0 12px;">
               <div class="label">Notes</div>
               <textarea data-role="notes" placeholder="optional">${escapeHtml(lane.notes||"")}</textarea>
@@ -224,7 +246,7 @@ window.NEVO_BOOT = function () {
               ${countCard("Cones (Bump)", idx, "conesBump")}
               ${countCard("Cones (Crush)", idx, "conesCrush")}
               ${countCard("Turn Signal", idx, "turnSignal")}
-              ${countCard("Stop Sign)", idx, "stopSign")}
+              ${countCard("Stop Sign", idx, "stopSign")}
             </div>
 
             <div class="bottom">
@@ -257,18 +279,49 @@ window.NEVO_BOOT = function () {
       const idx = Number(laneEl.dataset.idx);
       const lane = lanesState[idx];
 
+      // buttons
       laneEl.querySelectorAll("button[data-action]").forEach(btn=>{
         btn.addEventListener("click", ()=>handleAction(idx, btn.dataset.action, btn.dataset.key));
       });
 
+      // participant
       laneEl.querySelector('[data-role="participant"]').addEventListener("change", (e)=>{
         lane.participant = e.target.value;
         updateSummary(idx);
       });
 
+      // notes
       const notesEl = laneEl.querySelector('[data-role="notes"]');
       if(notesEl) notesEl.addEventListener("input", (e)=>{ lane.notes = e.target.value; });
 
+      // ✅ vehicle toggles (mutually exclusive)
+      laneEl.querySelectorAll('input[type="checkbox"][data-action="vehCar"], input[type="checkbox"][data-action="vehTruck"]').forEach(chk=>{
+        chk.addEventListener("change", ()=>{
+          if(chk.dataset.action === "vehCar"){
+            if(chk.checked){
+              lane.vehicle = "car";
+              const other = laneEl.querySelector('input[data-action="vehTruck"]');
+              if(other) other.checked = false;
+            } else {
+              chk.checked = true; // don’t allow neither selected
+            }
+          }
+          if(chk.dataset.action === "vehTruck"){
+            if(chk.checked){
+              lane.vehicle = "truck";
+              const other = laneEl.querySelector('input[data-action="vehCar"]');
+              if(other) other.checked = false;
+            } else {
+              chk.checked = true;
+            }
+          }
+          // update par/summary display
+          tickTimer(idx);
+          render();
+        });
+      });
+
+      // ✅ location checkboxes: update Sets on change (existing behavior)
       laneEl.querySelectorAll('input[type="checkbox"][data-action="bumpLoc"]').forEach(cb=>{
         cb.addEventListener("change", ()=>{
           const loc=cb.dataset.loc;
@@ -281,6 +334,18 @@ window.NEVO_BOOT = function () {
           const loc=cb.dataset.loc;
           if(cb.checked) lane.crushLocs.add(loc); else lane.crushLocs.delete(loc);
           updateSummary(idx);
+        });
+      });
+
+      // ✅ make the entire row reliably toggle (even if tap lands on padding)
+      laneEl.querySelectorAll('[data-role="locRow"]').forEach(row=>{
+        row.addEventListener("click", (ev)=>{
+          // If user clicked the checkbox itself, let default behavior happen.
+          if(ev.target && ev.target.tagName === "INPUT") return;
+          const cb = row.querySelector('input[type="checkbox"]');
+          if(!cb) return;
+          cb.checked = !cb.checked;
+          cb.dispatchEvent(new Event("change", { bubbles: true }));
         });
       });
     });
