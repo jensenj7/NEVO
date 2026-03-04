@@ -1,7 +1,7 @@
 window.NEVO_BOOT = function () {
   // ====== CONFIG ======
   const API_BASE = "https://script.google.com/macros/s/AKfycbx1qNcGkqn7a_gXPzxRGTw8q-4TwoMvWQLbMXiMJZ-Rp3QhfEyRvqw4casnV7LKk960/exec";
-  const API_KEY  = "nevo_6Rk9Qp2vT8mX4nH7cL1sZ5yJ3wD0aB8eG9fU2kV7"; // must match Code.gs
+  const API_KEY  = "nevo_6Rk9Qp2vT8mX4nH7cL1sZ5yJ3wD0aB8eG9fU2kV7";
   const NEVO_PIN = "1776";
   const PIN_TTL_DAYS = 30;
 
@@ -182,7 +182,6 @@ window.NEVO_BOOT = function () {
   function laneTemplate(idx){
     const lane = lanesState[idx];
     const par = getParSec(lane.vehicle);
-
     const armed = !!lane.startMs;
     const ended = !!lane.endMs;
 
@@ -363,8 +362,6 @@ window.NEVO_BOOT = function () {
       lane.running = false;
       lane.endMs = Date.now();
       stopTimerInterval(idx);
-
-      // Keep controls available until Submit.
       render();
       return;
     }
@@ -440,23 +437,34 @@ window.NEVO_BOOT = function () {
   function fetchRosterNames(){
     return new Promise((resolve) => {
       const cb = `NEVO_ROSTER_CB_${Math.random().toString(36).slice(2)}`;
+      const script = document.createElement("script");
+
       window[cb] = (data) => {
         try { delete window[cb]; } catch(e) { window[cb] = undefined; }
         script.remove();
-        resolve((data && data.ok && Array.isArray(data.names)) ? data.names : []);
+
+        if (!data || data.ok !== true) {
+          alert(`Roster fetch failed: ${data && data.error ? data.error : "unknown error"}\n\nMost common fixes:\n- API_KEY mismatch between Code.gs and app.js\n- Apps Script not redeployed after editing Code.gs\n- Web App access not set to Anyone`);
+          return resolve([]);
+        }
+
+        if (!Array.isArray(data.names)) return resolve([]);
+        return resolve(data.names);
       };
 
-      const script = document.createElement("script");
       const url = new URL(API_BASE);
       url.searchParams.set("action", "roster");
       url.searchParams.set("key", API_KEY);
       url.searchParams.set("callback", cb);
+
       script.src = url.toString();
       script.onerror = () => {
         try { delete window[cb]; } catch(e) { window[cb] = undefined; }
         script.remove();
+        alert("Roster fetch failed (network/script error). Check Web App access is set to Anyone and the /exec URL is correct.");
         resolve([]);
       };
+
       document.head.appendChild(script);
     });
   }
@@ -538,7 +546,12 @@ window.NEVO_BOOT = function () {
   async function init(){
     document.getElementById("syncBtn").disabled = true;
     updatePendingPill();
+
     rosterNames = await fetchRosterNames();
+    if (rosterNames.length === 0) {
+      alert("Roster loaded 0 names.\n\nIf your roster URL test returns ok:true but names is empty, check:\n- Sheet name is exactly 'Roster'\n- Names are in column A starting at A2\n- Spreadsheet ID in Code.gs is correct");
+    }
+
     render();
   }
 
