@@ -1,5 +1,6 @@
 window.NEVO_BOOT = function () {
-  const API_BASE = "https://script.google.com/macros/s/AKfycbz_Xa0q547X1k8rzWmLJbMFMVFzx7lJJ9RnjdFlREcZKMq7ubSZ5tSr__6FXQqJgRXM/exec"; // <-- keep the working one
+  // ====== CONFIG ======
+  const API_BASE = "https://script.google.com/macros/s/AKfycbz_Xa0q547X1k8rzWmLJbMFMVFzx7lJJ9RnjdFlREcZKMq7ubSZ5tSr__6FXQqJgRXM/exec";
   const API_KEY  = "nevo_6Rk9Qp2vT8mX4nH7cL1sZ5yJ3wD0aB8eG9fU2kV7";
   const NEVO_PIN = "1776";
   const PIN_TTL_DAYS = 30;
@@ -17,6 +18,7 @@ window.NEVO_BOOT = function () {
   function timeOnly(d){ return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'}); }
   function getParSec(vehicle){ return vehicle === "truck" ? COURSE.truckParSec : COURSE.carParSec; }
 
+  // ===== PIN GATE =====
   function isUnlocked(){
     const until = Number(localStorage.getItem(PIN_OK_KEY) || 0);
     return until && nowMs() < until;
@@ -51,6 +53,7 @@ window.NEVO_BOOT = function () {
     setTimeout(()=>input.focus(), 50);
   }
 
+  // ====== STATE ======
   function newLaneState(){
     return Object.seal({
       running:false,
@@ -75,6 +78,7 @@ window.NEVO_BOOT = function () {
   const lanesState = [newLaneState(), newLaneState(), newLaneState()];
   let rosterNames = [];
 
+  // ====== OFFLINE QUEUE ======
   function loadQueue(){ try{ return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); }catch(e){ return []; } }
   function saveQueue(q){ localStorage.setItem(LS_KEY, JSON.stringify(q)); }
   function queueAdd(item){ const q = loadQueue(); q.push(item); saveQueue(q); updatePendingPill(); }
@@ -87,6 +91,7 @@ window.NEVO_BOOT = function () {
     if (syncBtn) syncBtn.disabled = q.length === 0;
   }
 
+  // ====== COMPUTE ======
   function computeTimeFields(lane){
     if(!lane.startMs) return { totalSec:0, overSec:0, timePenalty:0, startTime:"", endTime:"" };
 
@@ -127,13 +132,11 @@ window.NEVO_BOOT = function () {
     return { score, status, nonTimePenalty, timePenalty, totalPenalty };
   }
 
+  // ====== UI helpers ======
   function escapeHtml(str){
     return String(str||"")
-      .replaceAll("&","&amp;")
-      .replaceAll("<","&lt;")
-      .replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;")
-      .replaceAll("'","&#039;");
+      .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;").replaceAll("'","&#039;");
   }
 
   function countCard(title, idx, key){
@@ -186,7 +189,6 @@ window.NEVO_BOOT = function () {
     return `
       <div class="lane ${lane.running ? "running":""} ${armed ? "armed":""}" data-idx="${idx}">
         <div class="laneInner">
-
           <div class="topGrid">
             <div>
               <div class="label">Participant</div>
@@ -195,7 +197,6 @@ window.NEVO_BOOT = function () {
                 ${participantOptions}
               </select>
             </div>
-
             <div class="timerBlock">
               <div class="timer" data-role="timer">00:00</div>
               <div class="timerMeta">
@@ -266,9 +267,7 @@ window.NEVO_BOOT = function () {
       });
 
       const notesEl = laneEl.querySelector('[data-role="notes"]');
-      if(notesEl){
-        notesEl.addEventListener("input", (e)=>{ lane.notes = e.target.value; });
-      }
+      if(notesEl) notesEl.addEventListener("input", (e)=>{ lane.notes = e.target.value; });
 
       laneEl.querySelectorAll('input[type="checkbox"][data-action="bumpLoc"]').forEach(cb=>{
         cb.addEventListener("change", ()=>{
@@ -301,16 +300,13 @@ window.NEVO_BOOT = function () {
     const lane = lanesState[idx];
 
     if(action==="start"){
-      if(lane.running || lane.paused) return;
-      if(lane.endMs) return;
-
+      if(lane.running || lane.paused || lane.endMs) return;
       lane.running = true;
       lane.paused = false;
       lane.startMs = Date.now();
       lane.endMs = null;
       lane.pausedAtMs = null;
       lane.pausedTotalMs = 0;
-
       startTimerInterval(idx);
       render();
       return;
@@ -325,26 +321,21 @@ window.NEVO_BOOT = function () {
         render();
         return;
       }
-
       if(lane.paused && !lane.running && !lane.endMs){
         const now = Date.now();
         const pausedChunk = Math.max(0, now - (lane.pausedAtMs || now));
         lane.pausedTotalMs = (lane.pausedTotalMs || 0) + pausedChunk;
-
         lane.paused = false;
         lane.running = true;
         lane.pausedAtMs = null;
-
         startTimerInterval(idx);
         render();
-        return;
       }
       return;
     }
 
     if(action==="end"){
       if(!lane.running && !lane.paused) return;
-
       if(lane.paused){
         const now = Date.now();
         const pausedChunk = Math.max(0, now - (lane.pausedAtMs || now));
@@ -352,7 +343,6 @@ window.NEVO_BOOT = function () {
         lane.pausedAtMs = null;
         lane.paused = false;
       }
-
       lane.running = false;
       lane.endMs = Date.now();
       stopTimerInterval(idx);
@@ -370,10 +360,8 @@ window.NEVO_BOOT = function () {
     if(action==="inc" || action==="dec"){
       const delta = action==="inc" ? 1 : -1;
       lane[key] = clamp0((lane[key]||0) + delta);
-
       if(key==="conesBump" && lane[key]===0) lane.bumpLocs.clear();
       if(key==="conesCrush" && lane[key]===0) lane.crushLocs.clear();
-
       render();
       return;
     }
@@ -427,6 +415,7 @@ window.NEVO_BOOT = function () {
     submitBtn.disabled = !ok;
   }
 
+  // ===== JSONP =====
   function jsonpCall(params){
     return new Promise((resolve, reject) => {
       const cb = `NEVO_JSONP_CB_${Math.random().toString(36).slice(2)}`;
@@ -466,20 +455,46 @@ window.NEVO_BOOT = function () {
     }
   }
 
-  async function submitToServer(payload){
-    // IMPORTANT: send raw JSON string (URLSearchParams encodes it)
-    return await jsonpCall({ action:"submit", payload: JSON.stringify(payload) });
+  // ===== POST submit + confirm =====
+  function newSubmissionId(){
+    return `sub_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  }
+
+  function postSubmit(payload){
+    const url = new URL(API_BASE);
+    url.searchParams.set("action", "submit");
+    url.searchParams.set("key", API_KEY);
+
+    return fetch(url.toString(), {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).then(() => true).catch(() => false);
+  }
+
+  async function confirmWritten(submissionId){
+    // poll up to ~8 seconds
+    const deadline = Date.now() + 8000;
+    while(Date.now() < deadline){
+      try{
+        const data = await jsonpCall({ action:"check", id: submissionId });
+        if(data && data.ok && data.written === true) return true;
+      }catch(e){}
+      await new Promise(r=>setTimeout(r, 500));
+    }
+    return false;
   }
 
   async function submitLane(idx){
-    // ✅ You should ALWAYS see this if the click handler is firing.
-    alert("Submitting…");
-
     const lane = lanesState[idx];
     const { totalSec, overSec, timePenalty, startTime, endTime } = computeTimeFields(lane);
     const { score, status, totalPenalty } = computeScore(lane);
 
+    const submissionId = newSubmissionId();
+
     const payload = {
+      submissionId,
       participant: lane.participant,
       startTime,
       endTime,
@@ -498,21 +513,26 @@ window.NEVO_BOOT = function () {
       notes: lane.notes || ""
     };
 
-    try{
-      const res = await submitToServer(payload);
-      if(res && res.ok){
-        alert("Submitted successfully ✅");
-        handleAction(idx, "clear");
-        return;
-      }
-      alert(`Submit failed: ${res && res.error ? res.error : "unknown error"}\nSaved to Pending for later sync.`);
+    // fire POST
+    const sent = await postSubmit(payload);
+    if(!sent){
+      alert("Submit failed to send (network). Saved to Pending.");
       queueAdd(payload);
       handleAction(idx, "clear");
-    }catch(e){
-      alert("Submit failed (network/script error). Saved to Pending for later sync.");
-      queueAdd(payload);
-      handleAction(idx, "clear");
+      return;
     }
+
+    // confirm write
+    const ok = await confirmWritten(submissionId);
+    if(ok){
+      alert("Submitted successfully ✅");
+      handleAction(idx, "clear");
+      return;
+    }
+
+    alert("Submit did not confirm write. Saved to Pending for later sync.");
+    queueAdd(payload);
+    handleAction(idx, "clear");
   }
 
   async function syncQueue(){
@@ -521,12 +541,10 @@ window.NEVO_BOOT = function () {
 
     const remaining=[];
     for(const item of q){
-      try{
-        const res = await submitToServer(item);
-        if(!(res && res.ok)) remaining.push(item);
-      }catch(e){
-        remaining.push(item);
-      }
+      const sent = await postSubmit(item);
+      if(!sent){ remaining.push(item); continue; }
+      const ok = await confirmWritten(item.submissionId);
+      if(!ok) remaining.push(item);
     }
     saveQueue(remaining);
     updatePendingPill();
